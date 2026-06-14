@@ -1,74 +1,42 @@
+#include <spdlog/sinks/ostream_sink.h>
+#include <spdlog/spdlog.h>
+
 #include <iostream>
-#include "vec3.h"
-#include "ray.h"
-#include "color.h"
 
-double hit_sphere( const point3 center, double radius, const ray& r ) {
-  vec3 oc = center - r.origin();
-  auto a = r.direction().length_squared();
-  auto h = dot(r.direction(), oc);
-  auto c = oc.length_squared() - radius*radius;
-  auto discriminant = h*h - a*c;
-  
-  if( discriminant < 0 ) {
-    return -1.0;
-  }
+int main(void) {
+  // Route spdlog to stderr so it doesn't pollute PPM stdout
+  auto stderr_sink =
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(std::cerr);
+  auto logger = std::make_shared<spdlog::logger>("console", stderr_sink);
+  spdlog::set_default_logger(logger);
 
-  return (h - std::sqrt(discriminant)) / a;
-}
+  // Image settings
+  int image_height = 256;
+  int image_width = 256;
 
-color rayColor( const ray& r ) {
-  auto t = hit_sphere( point3( 0, 0, -1 ), 0.5, r ) ;
-  if(t > 0.0 ) {
-    vec3 N = unit_vector( r.at( t ) - vec3( 0, 0, -1 ) );
-    return 0.5 * color( N.x()+1, N.y()+1, N.z()+1 );
-  }
+  spdlog::info("Saving image to ./image.ppm");
+  spdlog::info("Image size: {}px x {}px", image_width, image_height);
 
-  vec3 unit_direction = unit_vector(r.direction());
-  auto a = 0.5*(unit_direction.y() + 1.0);
-  return (1.0-a)*color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
-}
+  // Rendering
+  std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
-int main() {
-	
-	// Picture settings
-  double aspect_ratio = ( 16.0 ) / 9.0;
-  int imWidth = 400;
-	int imHeight = int( imWidth / aspect_ratio );
-  imHeight = ( imHeight < 1 ) ? 1 : imHeight;
+  for (int j = 0; j < image_height; j++) {
+    std::clog << "\rScanlines remaining: " << (image_height - j) << ' '
+              << std::flush;
+    for (int i = 0; i < image_width; i++) {
+      auto r = double(i) / (image_width - 1);
+      auto g = double(j) / (image_height - 1);
+      auto b = 0.0;
 
-  // Camera
-  double focalLength = 1.0;
-  double viewHeight = 2.0;
-  double viewWidth = viewHeight * ( double( imWidth ) / imHeight );
-  point3 cameraCenter = point3( 0.0, 0.0, 0.0 );
+      int ir = int(255.999 * r);
+      int ig = int(255.999 * g);
+      int ib = int(255.999 * b);
 
-  // Viewport
-  vec3 viewU = vec3( viewWidth, 0.0, 0.0 );
-  vec3 viewV = vec3( 0.0, -viewHeight, 0.0 );
-
-  vec3 pidexlDU = viewU / imWidth;
-  vec3 pidexlDV = viewV / imHeight;
-
-  point3 viewUpperLeft = cameraCenter - 
-                          vec3( 0, 0, focalLength ) -
-                          ( viewU / 2 ) -
-                          ( viewV / 2 );
-
-  point3 pixel00_loc = viewUpperLeft + 0.5 * ( pidexlDU + pidexlDV );
-
-	// Rendering
-	std::cout << "P3\n" << imWidth << ' ' << imHeight << "\n255\n";
-
-  for ( int j = 0; j < imHeight; j++ ) {
-    std::clog << "\rScanlines remaining: " << ( imHeight - j ) << ' ' << std::flush;
-    for ( int i = 0; i < imWidth; i++ ) {
-      point3 pixelCenter = pixel00_loc + ( i * pidexlDU ) + ( j * pidexlDV );
-      vec3 rDir = pixelCenter - cameraCenter;
-      ray r( cameraCenter, rDir );
-      color pixel_color = rayColor( r );
-      write_color( std::cout, pixel_color );
+      std::cout << ir << ' ' << ig << ' ' << ib << '\n';
     }
   }
-  std::clog << "\rDone.                 \n" << std::flush;
+  std::clog << "\r                      \r";
+
+  spdlog::info("Done.");
+  return 0;
 }
